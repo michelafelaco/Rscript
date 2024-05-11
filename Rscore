@@ -1,0 +1,97 @@
+#PACKAGES
+library(readxl)
+
+#IMPORTAZIONE DATASET CCLE
+dataset_CCLE <- read_excel("C:\\Users\\miche\\Desktop\\CNR lab\\Trascriptomic_R\\CCLE\\CCLE_log2_TPM.xlsx")
+View(dataset_CCLE)
+
+#MATRICIZZO I VALORI DI ESPRESSIONE E LI RENDO NUMERI
+matrix_CCLE <- as.matrix(dataset_CCLE)
+numeric_matrix_CCLE <- apply(matrix_CCLE [1:nrow(matrix_CCLE), 2:ncol(matrix_CCLE)], 2, as.numeric)
+row.names(numeric_matrix_CCLE) <- matrix_CCLE[1:nrow(matrix_CCLE), 1]
+
+#colonne_Hscore_resp
+colonna_BXPC3 <- grep("BXPC3", colnames(numeric_matrix_CCLE), value=TRUE)
+BXPC3 <- numeric_matrix_CCLE [, colonna_BXPC3]
+colonna_CAPAN1 <- grep("CAPAN1", colnames(numeric_matrix_CCLE), value=TRUE)
+CAPAN1 <- numeric_matrix_CCLE [, colonna_CAPAN1]
+colonna_HPAFII <- grep("HPAFII", colnames(numeric_matrix_CCLE), value=TRUE)
+HPAFII <- numeric_matrix_CCLE [, colonna_HPAFII]
+colonna_PANC0813 <- grep("PANC0813", colnames(numeric_matrix_CCLE), value=TRUE)
+PANC0813 <- numeric_matrix_CCLE [, colonna_PANC0813]
+colonna_8902 <- grep("8902", colnames(numeric_matrix_CCLE), value=TRUE)
+PaTu8902 <- numeric_matrix_CCLE [, colonna_8902]
+colonna_SU8686 <- grep("SU8686", colnames(numeric_matrix_CCLE), value=TRUE)
+SU8686 <- numeric_matrix_CCLE [, colonna_SU8686]
+
+#matrice_Hscore_resp
+HScore_resp <- cbind(BXPC3, CAPAN1, HPAFII, PANC0813, PaTu8902, SU8686)
+
+#colonne_HScore_NOresp
+colonna_ASPC1 <- grep("ASPC1", colnames(numeric_matrix_CCLE), value=TRUE)
+ASPC1 <- numeric_matrix_CCLE [, colonna_ASPC1]
+colonna_CFPAC1 <- grep("CFPAC1", colnames(numeric_matrix_CCLE), value=TRUE)
+CFPAC1 <- numeric_matrix_CCLE [, colonna_CFPAC1]
+colonna_HS766T <- grep("HS766T", colnames(numeric_matrix_CCLE), value=TRUE)
+HS766T <- numeric_matrix_CCLE [, colonna_HS766T]
+
+#matrice_HScore_NOresp
+HScore_NOresp <- cbind(ASPC1, CFPAC1, HS766T)
+
+#calcolo dei FOLD CHANGE
+FC <- nrow(HScore_resp)
+for (i in 1:nrow(HScore_resp)) {
+  FC[i] <- log(mean(HScore_NOresp [i,]) / mean(HScore_resp [i,]))
+  i = i+1
+}
+names(FC)<- rownames(HScore_resp)
+print(FC)
+
+#calcolo dei pvalue
+pvalue <- nrow(HScore_resp)
+for (i in 1:nrow(HScore_resp)) {
+  pvalue[i] <- (t.test(HScore_NOresp[i,], HScore_resp[i,]))$p.value
+  i=i+1
+}
+print(pvalue)
+
+#volcanoplot
+significant.color <- "red"
+non_significant.color <- "black"
+plot(FC, -log(pvalue),
+     col=(ifelse(pvalue < 0.05 & FC>1 | pvalue < 0.05 & FC<(-1), significant.color, non_significant.color)),
+     main = "Volcano Plot non resp/resp")
+abline(v =1, col = "red")
+abline(h= 3, col="red")
+abline(v =-1, col = "red")
+UP_sign_genes <- print(subset(FC, FC>1 & pvalue<0.05))
+DOWN_sign_genes <- print(subset(FC, FC<(-1) & pvalue<0.05))
+
+#creo file GSEA
+GSEA_expression <- cbind(HScore_NOresp, HScore_resp)
+GSEA_expression_file <- 2^(GSEA_expression)
+write.table(GSEA_expression_file, file = "GSEA_expression_file.txt", sep = "\t", row.names = TRUE)
+
+#colonne_INDEP
+colonna_KP4 <- grep("KP4", colnames(numeric_matrix_CCLE), value=TRUE)
+KP4 <- numeric_matrix_CCLE [, colonna_KP4]
+colonna_8988T <- grep("8988T", colnames(numeric_matrix_CCLE), value=TRUE)
+PaTu8988t <- numeric_matrix_CCLE [, colonna_8988T]
+colonna_SW1990 <- grep("SW1990", colnames(numeric_matrix_CCLE), value=TRUE)
+SW1990 <- numeric_matrix_CCLE [, colonna_SW1990]
+
+#Rscore_9 linee
+num_upregulated <- apply(GSEA_expression[names(UP_sign_genes),], 2, function(x) sum(x>median(GSEA_expression[names(UP_sign_genes),])))
+print(num_upregulated)
+num_downregulated <- apply(GSEA_expression[names(DOWN_sign_genes),], 2, function(x) sum(x>median(GSEA_expression[names(DOWN_sign_genes),])))
+print(num_downregulated)
+Rscore <- (num_upregulated/29*100) - (num_downregulated/95*100)
+print(Rscore)
+
+#Rscore_CCLE
+num_upregulated_CCLE <- apply(numeric_matrix_CCLE[names(UP_sign_genes),], 2, function(x) sum(x>median(numeric_matrix_CCLE[names(UP_sign_genes),])))
+print(num_upregulated_CCLE)
+num_downregulated_CCLE <- apply(numeric_matrix_CCLE[names(DOWN_sign_genes),], 2, function(x) sum(x>median(numeric_matrix_CCLE[names(DOWN_sign_genes),])))
+print(num_downregulated_CCLE)
+Rscore_CCLE <- (num_upregulated_CCLE/29*100) - (num_downregulated_CCLE/95*100)
+print(Rscore_CCLE)
